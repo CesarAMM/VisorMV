@@ -40,20 +40,16 @@ class VisorVM:
         self.actualizar_lista()
     
     def actualizar_lista(self):
-        # 1. Limpiar tabla actual
         for i in self.tabla.get_children():
             self.tabla.delete(i)
 
         try:
-            # 2. Obtener nombres de todas las máquinas virtuales
-            # 'listAllDomains' nos da objetos que representan cada VM
             dominios = self.conn.listAllDomains()
             
             for dom in dominios:
                 nombre = dom.name()
                 estado_id, _ = dom.state()
                 
-                # Traducir el ID de estado a texto entendible
                 estados = {
                     libvirt.VIR_DOMAIN_RUNNING: "Ejecutándose",
                     libvirt.VIR_DOMAIN_PAUSED: "Pausada",
@@ -62,7 +58,6 @@ class VisorVM:
                 }
                 estado_texto = estados.get(estado_id, "Desconocido")
 
-                # 3. Insertar en la tabla de Tkinter
                 self.tabla.insert("", "end", values=(nombre, estado_texto))
                 
         except libvirt.libvirtError as e:
@@ -72,10 +67,43 @@ class VisorVM:
         messagebox.showinfo("Acción", "Aquí abriremos el formulario para crear la VM")
 
     def iniciar_vm(self):
-        print("Intentando iniciar VM...")
+        seleccion = self.tabla.selection()
+        if not seleccion:
+            messagebox.showwarning("Atención", "Por favor, selecciona una VM de la lista.")
+            return
+
+        item = self.tabla.item(seleccion)
+        nombre_vm = item['values'][0]
+
+        try:
+            dom = self.conn.lookupByName(nombre_vm)
+            
+            dom.create()
+            messagebox.showinfo("Éxito", f"La máquina '{nombre_vm}' se está iniciando.")
+            
+            self.actualizar_lista()
+            
+        except libvirt.libvirtError as e:
+            messagebox.showerror("Error", f"No se pudo iniciar la VM: {e}")
 
     def detener_vm(self):
-        print("Intentando detener VM...")
+        seleccion = self.tabla.selection()
+        if not seleccion:
+            messagebox.showwarning("Atención", "Selecciona una VM para detener.")
+            return
+
+        item = self.tabla.item(seleccion)
+        nombre_vm = item['values'][0]
+
+        try:
+            dom = self.conn.lookupByName(nombre_vm)
+            dom.destroy()
+            messagebox.showinfo("Éxito", f"La máquina '{nombre_vm}' ha sido detenida.")
+            
+            self.actualizar_lista()
+            
+        except libvirt.libvirtError as e:
+            messagebox.showerror("Error", f"No se pudo detener la VM: {e}")
 
 
 if __name__ == "__main__":
