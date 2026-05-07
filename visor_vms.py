@@ -4,6 +4,7 @@ import libvirt
 import sys
 
 class VisorVM:
+    ## SECCION DE LA VENTA PRINCIPAL
     def __init__(self, root):
         self.root = root
         self.root.title("Maquinas Virtuales")
@@ -28,6 +29,9 @@ class VisorVM:
 
         btn_detener = tk.Button(frame_botones, text="Detener", command=self.detener_vm, bg="red", fg="white", width=12)
         btn_detener.grid(row=0, column=2, padx=5)
+
+        btn_eliminar = tk.Button(frame_botones, text="Eliminar", command=self.eliminar_vm, bg="red", fg="white", width=12)
+        btn_eliminar.grid(row=1, column=1, padx=5)
 
         try:
             self.conn = libvirt.open('qemu:///system')
@@ -62,9 +66,6 @@ class VisorVM:
                 
         except libvirt.libvirtError as e:
             messagebox.showerror("Error", f"No se pudo obtener la lista: {e}")
-
-    def ventana_crear(self):
-        messagebox.showinfo("Acción", "Aquí abriremos el formulario para crear la VM")
 
     def iniciar_vm(self):
         seleccion = self.tabla.selection()
@@ -105,6 +106,76 @@ class VisorVM:
         except libvirt.libvirtError as e:
             messagebox.showerror("Error", f"No se pudo detener la VM: {e}")
 
+    def eliminar_vm(self):
+        seleccion = self.tabla.selection()
+        if not seleccion: return
+        
+        nombre_vm = self.tabla.item(seleccion)['values'][0]
+        if messagebox.askyesno("Confirmar", f"¿Seguro que quieres borrar '{nombre_vm}'?"):
+            try:
+                dom = self.conn.lookupByName(nombre_vm)
+                dom.undefine()
+                self.actualizar_lista()
+            except libvirt.libvirtError as e:
+                messagebox.showerror("Error", str(e))
+
+    ## SECCION PARA AGREGAR UNA MAQUINA NUEVA
+    def ventana_crear(self):
+        self.win_crear = tk.Toplevel(self.root)
+        self.win_crear.title("Configurar Nueva VM")
+        self.win_crear.geometry("300x250")
+
+        tk.Label(self.win_crear, text="Nombre de la VM:").pack(pady=5)
+        self.ent_nombre = tk.Entry(self.win_crear)
+        self.ent_nombre.pack()
+
+        tk.Label(self.win_crear, text="Memoria RAM (MB):").pack(pady=5)
+        self.ent_ram = tk.Entry(self.win_crear)
+        self.ent_ram.insert(0, "1024") # Valor por defecto
+        self.ent_ram.pack()
+
+        tk.Label(self.win_crear, text="CPUs:").pack(pady=5)
+        self.ent_cpu = tk.Entry(self.win_crear)
+        self.ent_cpu.insert(0, "1")
+        self.ent_cpu.pack()
+
+        tk.Button(self.win_crear, text="Crear Máquina", command=self.ejecutar_creacion, bg="green", fg="white").pack(pady=20)
+
+    def ejecutar_creacion(self):
+        nombre = self.ent_nombre.get()
+        
+        if not nombre:
+            messagebox.showwarning("Error", "El nombre no puede estar vacío")
+            return
+            
+        ram = int(self.ent_ram.get()) * 1024 
+        cpu = self.ent_cpu.get()
+        
+        xml_config = f""" 
+        <domain type='kvm'>
+          <name>{nombre}</name>
+          <memory unit='KiB'>{ram}</memory>
+          <vcpu>{cpu}</vcpu>
+          <os>
+            <type arch='x86_64' machine='pc'>hvm</type>
+          </os>
+          <devices>
+            <emulator>/usr/bin/qemu-system-x86_64</emulator>
+            <interface type='user'>
+              <model type='virtio'/>
+            </interface>
+            <graphics type='vnc' port='-1' autoport='yes'/>
+          </devices>
+        </domain>
+        """
+
+        try:
+            self.conn.defineXML(xml_config)
+            messagebox.showinfo("Éxito", f"Máquina '{nombre}' creada correctamente.")
+            self.win_crear.destroy()
+            self.actualizar_lista()
+        except libvirt.libvirtError as e:
+            messagebox.showerror("Error de Libvirt", f"Detalle técnico: {e}")
 
 if __name__ == "__main__":
     root = tk.Tk()
