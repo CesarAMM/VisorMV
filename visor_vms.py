@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import libvirt
 import sys
+import subprocess
 
 class VisorVM:
     ## SECCION DE LA VENTA PRINCIPAL
@@ -123,12 +124,20 @@ class VisorVM:
     def ventana_crear(self):
         self.win_crear = tk.Toplevel(self.root)
         self.win_crear.title("Configurar Nueva VM")
-        self.win_crear.geometry("300x250")
+        self.win_crear.geometry("600x350")
 
-        tk.Label(self.win_crear, text="Nombre de la VM:").pack(pady=5)
-        self.ent_nombre = tk.Entry(self.win_crear)
-        self.ent_nombre.pack()
+        frame_formulario = tk.Frame(self.win_crear)
+        frame_formulario.pack(pady=10)
 
+        tk.Label(frame_formulario, text="Nombre de la MV: ", width=20).grid(row=0, column=0, padx=1)
+        self.entNombre = tk.Entry(frame_formulario).grid(row=0, column=1, padx=2)
+        
+        tk.Label(frame_formulario, text="ISO:", width=20).grid(row=1, column=0, padx=1)
+        self.ent_iso = tk.Entry(frame_formulario).grid(row=1, column=1, padx=1)
+
+        tk.Label(frame_formulario, text="DISK:", width=20).grid(row=2, column=0, padx=1)
+        self.ent_disk = tk.Entry(frame_formulario).grid(row=2, column=1, padx=1)
+        
         tk.Label(self.win_crear, text="Memoria RAM (MB):").pack(pady=5)
         self.ent_ram = tk.Entry(self.win_crear)
         self.ent_ram.insert(0, "1024") # Valor por defecto
@@ -142,37 +151,86 @@ class VisorVM:
         tk.Button(self.win_crear, text="Crear Máquina", command=self.ejecutar_creacion, bg="green", fg="white").pack(pady=20)
 
     def ejecutar_creacion(self):
-        nombre = self.ent_nombre.get()
-        
+        nombre = self.entNombre.get()
+        ruta_disk = self.ent_disk.get()
+        ruta_iso = self.ent_iso.get()
+
+        if not ruta_disk:
+            messagebox.showerror("Error Disk", "La ruta esta vacio")
+            return
+
+        if not ruta_iso:
+            messagebox.showerror("Error ISO", "La ruta ISO esta vacio")
+            return
+
         if not nombre:
             messagebox.showwarning("Error", "El nombre no puede estar vacío")
             return
             
         ram = int(self.ent_ram.get()) * 1024 
         cpu = self.ent_cpu.get()
+
+        try:
+            subprocess.run(
+                ["qemu-img", "create", "-f", "qcow2", ruta_disk, "20G"],
+                check=True,
+                capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Error crear Disco", f"Detalle técnico: {e.stderr.decode()}")
         
         xml_config = f""" 
         <domain type='kvm'>
           <name>{nombre}</name>
           <memory unit='KiB'>{ram}</memory>
           <vcpu>{cpu}</vcpu>
+          
           <os>
             <type arch='x86_64' machine='pc'>hvm</type>
+            <boot dev='cdrom'/>
+            <boot dev='hd'/>
           </os>
+          
           <devices>
             <emulator>/usr/bin/qemu-system-x86_64</emulator>
+            
+
+            <disk type='file' device='disk'>
+                <driver name='qemu' type='qcow2'/>
+                <source file='{ruta_disk}'/>
+                <target dev='vda' bus='virtio'/>
+            </disk>
+
+            <disk type='file' device='cdrom'>
+                <driver name='qemu' type='raw'/>
+                <source file='${ruta_iso}'/>
+                <target dev='sda' bus='sata'/>
+                <readonly/>
+            </disk>
+
+
+            <interface type='network'>
+                <source network='default'/>
+                <model type='virtio'/>
+            </interface>
+
             <interface type='user'>
               <model type='virtio'/>
             </interface>
+            
             <graphics type='vnc' port='-1' autoport='yes'/>
+
+            <video>
+                <model type='virtio'/>
+            </video>
           </devices>
         </domain>
         """
 
         try:
+            self.win_crear.destroy()
             self.conn.defineXML(xml_config)
             messagebox.showinfo("Éxito", f"Máquina '{nombre}' creada correctamente.")
-            self.win_crear.destroy()
             self.actualizar_lista()
         except libvirt.libvirtError as e:
             messagebox.showerror("Error de Libvirt", f"Detalle técnico: {e}")
