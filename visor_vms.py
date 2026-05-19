@@ -155,17 +155,17 @@ class VisorVM:
         ## FILA 2
         tk.Label(frame_formulario, text="Ruta ISO:", anchor="w", width=15).grid(row=1, column=0, padx=1, pady=2)
         frame_iso = tk.Frame(frame_formulario)
-        frame_iso.grid(row=1, column=1, sticky="w")
-        self.ent_iso = tk.Entry(frame_iso, width=15)
+        frame_iso.grid(row=1, column=1, columnspan=3, sticky="ew", padx=2, pady=2)
+        self.ent_iso = tk.Entry(frame_iso, width=55)
         self.ent_iso.pack(side="left")
         tk.Button(frame_iso, text="📁", command=self.seleccionar_iso).pack(side="right", padx=2)
 
 
         tk.Label(frame_formulario, text="Ruta DISK:", anchor="w", width=15).grid(row=2, column=0, padx=1, pady=2)
         frame_disk = tk.Frame(frame_formulario)
-        frame_disk.grid(row=2, column=1, sticky="w")
-        self.ent_disk = tk.Entry(frame_disk, width=15)
-        self.ent_disk.pack(side="left")
+        frame_disk.grid(row=2, column=1,columnspan=3, sticky="ew", padx=2, pady=2)
+        self.ent_ruta_disk = tk.Entry(frame_disk, width=55)
+        self.ent_ruta_disk.pack(side="left")
         tk.Button(frame_disk, text="📁", command=self.seleccionar_carpeta_disco).pack(side="right", padx=2)
 
         ## FILA 3
@@ -187,7 +187,7 @@ class VisorVM:
 
     def ejecutar_creacion(self):
         nombre = self.entNombre.get()
-        ruta_disk = self.ent_disk.get()
+        ruta_disk = self.ent_ruta_disk.get()
         ruta_iso = self.ent_iso.get()
         ram = int(self.ent_ram.get()) * 1024 
         cpu = self.ent_cpu.get()
@@ -248,13 +248,13 @@ class VisorVM:
             
                     <disk type='file' device='disk'>
                         <driver name='qemu' type='qcow2'/>
-                        <source file='{ruta_disk}'/>
+                        <source file='{ruta_completa_disk}'/>
                         <target dev='vda' bus='virtio'/>
                     </disk>
 
                     <disk type='file' device='cdrom'>
                         <driver name='qemu' type='raw'/>
-                        <source file='${ruta_iso}'/>
+                        <source file='{ruta_iso}'/>
                         <target dev='sda' bus='sata'/>
                         <readonly/>
                     </disk>
@@ -277,8 +277,8 @@ class VisorVM:
             </domain>
         """
         try:
-            self.win_crear.destroy()
             self.conn.defineXML(xml_config)
+            self.win_crear.destroy()
             messagebox.showinfo("Éxito", f"Máquina '{nombre}' creada correctamente.")
             self.actualizar_lista()
         except libvirt.libvirtError as e:
