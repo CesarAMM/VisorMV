@@ -32,8 +32,11 @@ class VisorVM:
         btn_detener = tk.Button(frame_botones, text="Detener", command=self.detener_vm, bg="red", fg="white", width=12)
         btn_detener.grid(row=0, column=2, padx=5)
 
+        btn_operar = tk.Button(frame_botones, text="Mostrar", command=self.def_operar_vm, bg="red", fg="white", width=12)
+        btn_operar.grid(row=0, column=3, padx=5)
+
         btn_eliminar = tk.Button(frame_botones, text="Eliminar", command=self.eliminar_vm, bg="red", fg="white", width=12)
-        btn_eliminar.grid(row=1, column=1, padx=5)
+        btn_eliminar.grid(row=0, column=4, padx=5)
 
         try:
             self.conn = libvirt.open('qemu:///system')
@@ -68,6 +71,37 @@ class VisorVM:
                 
         except libvirt.libvirtError as e:
             messagebox.showerror("Error", f"No se pudo obtener la lista: {e}")
+
+    def def_operar_vm(self):
+        # 1. Obtener la máquina seleccionada de la tabla
+        seleccion = self.tabla.selection()
+        if not seleccion:
+            messagebox.showwarning("Atención", "Por favor, selecciona una máquina de la lista para operar.")
+            return
+
+        nombre_vm = self.tabla.item(seleccion)['values'][0]
+
+        try:
+            # 2. Buscar el objeto de la máquina en Libvirt
+            dom = self.conn.lookupByName(nombre_vm)
+            
+            # 3. Validar si la máquina está encendida (Si está apagada, no hay señal de video)
+            if not dom.isActive():
+                messagebox.showwarning("Máquina Apagada", f"La máquina '{nombre_vm}' debe estar 'Ejecutándose' para poder operar en ella. Iníciala primero.")
+                return
+
+            # 4. Lanzar la ventana del visor de manera asíncrona usando Popen
+            # Esto evita que tu ventana de Tkinter se quede congelada mientras usas la VM
+            subprocess.Popen(
+                ["virt-viewer", "--connect", "qemu:///system", "--wait", nombre_vm],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+        except libvirt.libvirtError as e:
+            messagebox.showerror("Error de Libvirt", f"No se pudo conectar con la consola de la VM: {e}")
+        except FileNotFoundError:
+            messagebox.showerror("Dependencia Faltante", "No se encontró 'virt-viewer' en el sistema. Ejecuta en tu terminal: sudo apt install virt-viewer")
 
     def iniciar_vm(self):
         seleccion = self.tabla.selection()
@@ -249,7 +283,7 @@ class VisorVM:
                     <disk type='file' device='disk'>
                         <driver name='qemu' type='qcow2'/>
                         <source file='{ruta_completa_disk}'/>
-                        <target dev='vda' bus='virtio'/>
+                        <target dev='vda' bus='virtio'/> 
                     </disk>
 
                     <disk type='file' device='cdrom'>
