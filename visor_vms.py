@@ -32,7 +32,7 @@ class VisorVM:
         btn_detener = tk.Button(frame_botones, text="Detener", command=self.detener_vm, bg="red", fg="white", width=12)
         btn_detener.grid(row=0, column=2, padx=5)
 
-        btn_operar = tk.Button(frame_botones, text="Mostrar", command=self.def_operar_vm, bg="red", fg="white", width=12)
+        btn_operar = tk.Button(frame_botones, text="Mostrar", command=self.def_operar_vm, bg="blue", fg="white", width=12)
         btn_operar.grid(row=0, column=3, padx=5)
 
         btn_eliminar = tk.Button(frame_botones, text="Eliminar", command=self.eliminar_vm, bg="red", fg="white", width=12)
@@ -144,12 +144,23 @@ class VisorVM:
 
     def eliminar_vm(self):
         seleccion = self.tabla.selection()
-        if not seleccion: return
+
+        if not seleccion:
+            messagebox.showwarning("Advertencia", "Por favor, seleccione una máquina virtual para eliminar.")
+            return
         
         nombre_vm = self.tabla.item(seleccion)['values'][0]
         if messagebox.askyesno("Confirmar", f"¿Seguro que quieres borrar '{nombre_vm}'?"):
             try:
                 dom = self.conn.lookupByName(nombre_vm)
+                
+                if dom.isActive():
+                    messagebox.showerror(
+                        "Error de Eliminación", 
+                        f"La máquina '{nombre_vm}' está actualmente EN EJECUCIÓN.\n\nDebe detenerla (apagarla) antes de poder eliminarla."
+                    )
+                    return
+                
                 dom.undefine()
                 self.actualizar_lista()
             except libvirt.libvirtError as e:
@@ -206,7 +217,8 @@ class VisorVM:
         tk.Label(frame_formulario, text="Espacio DISK:", anchor="w", width=15).grid(row=3, column=0, padx=1, pady=2)
         self.ent_spec_disk = tk.Entry(frame_formulario)
         self.ent_spec_disk.grid(row=3, column=1, padx=1, pady=2)
-        
+        self.ent_spec_disk.insert(0, "20")
+
         tk.Label(frame_formulario, text="Memoria RAM (MB):", anchor="w", width=15).grid(row=3, column=2, padx=1, pady=2)
         self.ent_ram = tk.Entry(frame_formulario)
         self.ent_ram.grid(row=3, column=3, padx=1, pady=2)
@@ -253,9 +265,6 @@ class VisorVM:
         
         ruta_completa_disk = os.path.join(ruta_disk, f"{nombre}.qcow2")
         
-        print(f"Ruta de Disco: {ruta_completa_disk}")
-        print(f"Ruta de ISO: {ruta_iso}")
-        
         try:
             subprocess.run(
                 ["qemu-img", "create", "-f", "qcow2", ruta_completa_disk, f"{disk}G"],
@@ -273,8 +282,8 @@ class VisorVM:
                 
                 <os>
                     <type arch='x86_64' machine='pc'>hvm</type>
-                    <boot dev='cdrom'/>
                     <boot dev='hd'/>
+                    <boot dev='cdrom'/>
                 </os>
           
                 <devices>
