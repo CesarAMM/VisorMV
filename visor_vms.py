@@ -142,16 +142,13 @@ class VisorVM:
             return
 
         nombre_vm = self.tabla.item(seleccion[0])['values'][0]
-
         try:
             # 2. Buscar el objeto de la máquina en Libvirt
             dom = self.conn.lookupByName(nombre_vm)
-
             # 3. Validar si la máquina está encendida (Si está apagada, no hay señal de video)
             if not dom.isActive():
                 messagebox.showwarning("Máquina Apagada", f"La máquina '{nombre_vm}' debe estar 'Ejecutándose' para poder operar en ella. Iníciala primero.")
                 return
-
             # 4. Lanzar la ventana del visor de manera asíncrona usando Popen
             # Esto evita que tu ventana de Tkinter se quede congelada mientras usas la VM
             subprocess.Popen(
@@ -159,7 +156,6 @@ class VisorVM:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-
         except libvirt.libvirtError as e:
             messagebox.showerror("Error de Libvirt", f"No se pudo conectar con la consola de la VM: {e}")
         except FileNotFoundError:
